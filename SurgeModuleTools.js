@@ -3,7 +3,7 @@
 // icon-color: blue; icon-glyph: cloud-download-alt;
 
 // prettier-ignore
-let ToolVersion = "2.04.1"; // 本地改版：更新模块时保留本地 #!category
+let ToolVersion = "2.04.2"; // 本地改版：更新模块时保留本地 #!category
 
 //用于自定义发送请求的请求头
 const reqHeaders = {
@@ -13,10 +13,22 @@ const reqHeaders = {
 }
 
 async function delay(milliseconds) {
-  var before = Date.now()
-  while (Date.now() < before + milliseconds) {}
-  return true
+  return new Promise((resolve) => {
+    Timer.schedule(milliseconds, false, () => resolve(true))
+  })
 }
+// 按段数字比较版本号：2.04.10 > 2.04.9，字符串比较会误判
+function compareVersions(a, b) {
+  const pa = `${a}`.split('.').map((n) => parseInt(n, 10) || 0)
+  const pb = `${b}`.split('.').map((n) => parseInt(n, 10) || 0)
+  const len = Math.max(pa.length, pb.length)
+  for (let i = 0; i < len; i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0)
+    if (d !== 0) return d
+  }
+  return 0
+}
+
 function convertToValidFileName(str) {
   // 替换非法字符为下划线
   const invalidCharsRegex = /[\/:*?"<>|]/g
@@ -126,7 +138,7 @@ let report = {
 }
 
 for await (const [index, file] of files.entries()) {
-  if (file && !/\.(conf|txt|js|list)$/i.test(file)) {
+  if (file && /\.sgmodule$/i.test(file)) {
     // console.log(file);
     let originalName
     let originalDesc
@@ -275,10 +287,10 @@ for await (const [index, file] of files.entries()) {
 }
 if (!checkUpdate && !fromUrlScheme) {
   alert = new Alert()
-  let upErrk = report.fail.length > 0 ? `❌ 更新失败: ${report.fail.length}` : '',
-    noUrlErrk = report.noUrl > 0 ? `🈚️ 无链接: ${report.noUrl}` : ''
+  let upErr = report.fail.length > 0 ? `❌ 更新失败: ${report.fail.length}` : '',
+    noUrlErr = report.noUrl > 0 ? `🈚️ 无链接: ${report.noUrl}` : ''
   alert.title = `📦 模块总数: ${report.success + report.fail.length + report.noUrl}`
-  alert.message = `${noUrlErrk}\n✅ 更新成功: ${report.success}\n${upErrk}${
+  alert.message = `${noUrlErr}\n✅ 更新成功: ${report.success}\n${upErr}${
     report.fail.length > 0 ? `\n${report.fail.join(', ')}` : ''
   }`
   alert.addDestructiveAction('重载 Surge')
@@ -333,7 +345,7 @@ async function update() {
     await alert.presentAlert()
     return
   } else {
-    let needUpdate = version > ToolVersion
+    let needUpdate = compareVersions(version, ToolVersion) > 0
     if (!needUpdate) {
       let alert = new Alert()
       alert.title = 'Surge 模块工具'
