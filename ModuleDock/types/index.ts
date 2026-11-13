@@ -1,0 +1,119 @@
+// 数据类型定义
+
+/**
+ * 目标 App。Script-Hub 的 target 取值：
+ * surge-module / loon-plugin / stash-stoverride / shadowrocket-module
+ */
+export type TargetId = "surge" | "loon" | "stash" | "shadowrocket"
+
+/** 单个目标 App 的元信息 */
+export type TargetInfo = {
+  id: TargetId
+  /** App 名称 */
+  app: string
+  /** 该 App 里这类文件的叫法：模块 / 插件 / 覆写 */
+  kind: string
+  /** 文件后缀，含点 */
+  extension: string
+  /** Script-Hub 的 target 参数值 */
+  scriptHubTarget: string
+  /** 该 App 的远程导入 URL Scheme 前缀 */
+  remoteScheme: string
+  /** App 透明图标（PNG 远程地址） */
+  iconUrl: string
+}
+
+/** 模块文件解析出的头部信息 */
+export type ModuleHeader = {
+  /** #!name 的值 */
+  name: string
+  /** #!desc 的值（已去掉时间戳前缀） */
+  desc: string
+  /** #!desc 原始值，含 🔗 时间戳 */
+  rawDesc: string
+  /** #SUBSCRIBED 后面的订阅链接 */
+  subscribedUrl: string | null
+  /** #!category 的值；没有该行时为 null */
+  category: string | null
+}
+
+/** 单个模块在界面上的状态 */
+export type ModuleStatus = "idle" | "updating" | "success" | "failed" | "no-url"
+
+/** 列表中的模块条目 */
+export type ModuleEntry = {
+  /** 绝对路径，作为唯一标识 */
+  path: string
+  /** 文件名 */
+  fileName: string
+  /** 模块名称 */
+  name: string
+  /** 模块描述 */
+  desc: string
+  /** 订阅链接 */
+  subscribedUrl: string | null
+  /** 文件大小（字节） */
+  size: number
+  /** 文件修改时间（毫秒） */
+  modifiedAt: number
+  /** 是否包含可更新的订阅链接 */
+  hasSubscription: boolean
+  /** 该文件属于哪个目标 App */
+  target: TargetId
+  /** 最近一次操作状态 */
+  status: ModuleStatus
+  /** 失败原因 */
+  error?: string
+}
+
+/** 某个目标 App 的专属文件夹 */
+export type TargetFolder = {
+  /** 目录书签名称，用于跨启动访问 */
+  bookmark: string | null
+  /** 上次解析出的文件夹路径，仅作展示 */
+  path: string | null
+}
+
+/** 持久化设置 */
+export type Settings = {
+  /** 模块文件夹书签名称，用于跨启动访问 */
+  folderBookmark: string | null
+  /** 上次解析出的文件夹路径，仅作展示 */
+  folderPath: string | null
+  /** 下载模块时使用的 User-Agent */
+  userAgent: string
+  /** 更新完成后是否尝试重载 Surge */
+  reloadAfterUpdate: boolean
+  /** 是否显示无订阅链接的模块 */
+  showModulesWithoutUrl: boolean
+  /** 各目标 App 的专属文件夹；未设的目标回落到主文件夹 */
+  targetFolders: Partial<Record<TargetId, TargetFolder>>
+}
+
+/** 更新单个模块的结果 */
+export type UpdateResult =
+  | { ok: true; entry: ModuleEntry; changedName: boolean; changedDesc: boolean }
+  | { ok: false; reason: "no-url" | "network" | "invalid" | "write"; message: string; entry: ModuleEntry }
+
+/** 批量更新的统计 */
+export type UpdateSummary = {
+  total: number
+  success: number
+  noUrl: number
+  failed: string[]
+}
+
+/** 新建 / 更新模块时可选的落盘目录 */
+export type FolderState = {
+  path: string | null
+  source: "bookmark" | "default"
+}
+
+/** 应用内路由 */
+export type Route =
+  | { name: "home" }
+  | { name: "add"; url?: string; moduleName?: string; target?: TargetId }
+  | { name: "detail"; path: string }
+  | { name: "settings" }
+
+export type Navigate = (route: Route) => void

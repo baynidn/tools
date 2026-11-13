@@ -1,0 +1,31 @@
+{
+  "author" : {
+    "name" : "baynidn",
+    "homepage" : "https://github.com/baynidn/tools",
+    "email" : null
+  },
+  "runInApp" : false,
+  "name" : "SurgeMod",
+  "contributors" : [
+
+  ],
+  "localizedDescriptions" : {
+    "zh" : "Surge 本地模块管理器：只保留 Surge 功能，批量更新 #SUBSCRIBED、从链接安装、重载 Surge，更新时保留本地 #!category。"
+  },
+  "iconImage" : "",
+  "remoteDefinitionId" : null,
+  "permissions" : null,
+  "localizedNames" : {
+    "zh" : "SurgeMod"
+  },
+  "intentInputTypes" : [
+    "texts",
+    "urls"
+  ],
+  "color" : "rgba(10, 132, 255, 1)",
+  "version" : "1.0.0",
+  "entry" : "index.tsx",
+  "description" : "Surge-only local module manager: batch-update #SUBSCRIBED Surge modules, install from URL, reload Surge, and preserve local #!category on update.",
+  "icon" : "square.stack.3d.up.fill",
+  "remoteResource" : null
+}
