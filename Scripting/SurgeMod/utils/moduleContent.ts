@@ -1,0 +1,241 @@
+import { IGNORED_EXTENSIONS } from "../constants"
+import type { ModuleHeader } from "../types"
+
+/** 匹配 #!name 行 */
+const NAME_RE = /^#!\s*name\s*=\s*(.*?)\s*$/im
+/** 匹配 #!desc 行 */
+const DESC_RE = /^#!\s*desc\s*=\s*(.*?)\s*$/im
+/** 匹配 #!category 行（模块里的分类字段）；值两侧只吃横向空白，避免 \s 吃掉换行导致空值串行 */
+const CATEGORY_RE = /^#![ \t]*category[ \t]*=[ \t]*(.*?)[ \t]*$/im
+/** 匹配 #SUBSCRIBED 行 */
+const SUBSCRIBED_RE = /^#SUBSCRIBED\s+(.*?)\s*$/im
+/** 匹配所有 #! 指令行 */
+const DIRECTIVE_RE = /^#!.+$/gm
+
+/** 统一换行符，避免 CRLF 造成解析差异 */
+export function normalizeNewlines(text: string): string {
+  return text.replace(/\r\n?/g, "\n")
+}
+
+/** 去掉描述里由本工具写入的 “🔗 [时间]” 前缀 */
+export function stripStamp(desc: string): string {
+  return desc.replace(/^🔗\s*\[[^\]]*\]\s*/, "").trim()
+}
+
+/** 取出文件里的 #!category 值；没有该行返回 null（与空值区分开） */
+export function extractCategory(raw: string): string | null {
+  const match = normalizeNewlines(raw).match(CATEGORY_RE)
+  return match ? match[1].trim() : null
+}
+
+/**
+ * 把本地保留的 #!category 写回内容：
+ * 有该行则替换值，没有则插在 #!name 行后；category 为 null 表示本地无分类，不动上游的值。
+ * 与 SurgeModuleTools 2.04.2 本地改版的保留逻辑一致。
+ */
+export function applyPreservedCategory(content: string, category: string | null): string {
+  if (category === null) {
+    return content
+  }
+  if (CATEGORY_RE.test(content)) {
+    return content.replace(CATEGORY_RE, `#!category=${category}`)
+  }
+  const nameMatch = content.match(/^#!\s*name\s*=.*$/im)
+  if (nameMatch && nameMatch.index !== undefined) {
+    const insertAt = nameMatch.index + nameMatch[0].length
+    return `${content.slice(0, insertAt)}\n#!category=${category}${content.slice(insertAt)}`
+  }
+  return `#!category=${category}\n${content}`
+}
+
+/** 解析模块头部信息 */
+export function parseModuleHeader(raw: string): ModuleHeader {
+  const content = normalizeNewlines(raw)
+  const nameMatch = content.match(NAME_RE)
+  const descMatch = content.match(DESC_RE)
+  const subscribedMatch = content.match(SUBSCRIBED_RE)
+
+  const name = nameMatch ? nameMatch[1].trim() : ""
+  const rawDesc = descMatch ? descMatch[1].trim() : ""
+
+  return {
+    name,
+    desc: stripStamp(rawDesc),
+    rawDesc,
+    subscribedUrl: subscribedMatch ? subscribedMatch[1].trim() : null,
+    category: extractCategory(content),
+  }
+}
+
+/** 从任意文本中取出 #SUBSCRIBED 链接 */
+export function extractSubscribedUrl(raw: string): string | null {
+  return parseModuleHeader(raw).subscribedUrl
+}
+
+/** 判断文本是否像一份合法的 Surge 模块（有 #!name） */
+export function isModuleContent(raw: string): boolean {
+  const content = normalizeNewlines(raw)
+  if (!content.trim()) {
+    return false
+  }
+  return NAME_RE.test(content)
+}
+
+/** 在最后一个 #! 指令行之后插入内容 */
+export function insertAfterLastDirective(content: string, addition: string): string {
+  const re = new RegExp(DIRECTIVE_RE.source, "gm")
+  let end = -1
+  let match: RegExpExecArray | null = re.exec(content)
+  while (match !== null) {
+    end = match.index + match[0].length
+    match = re.exec(content)
+  }
+  if (end < 0) {
+    return addition + content
+  }
+  return content.slice(0, end) + addition + content.slice(end)
+}
+
+/** 生成带时间戳的描述 */
+export function formatStamp(date: Date): string {
+  return date.toLocaleString()
+}
+
+/** 移除旧的订阅链接、链接标题与目标标记 */
+function removeMarkers(body: string): string {
+  const cleaned = body
+    .replace(/^#SUBSCRIBED.*$/gim, "")
+    .replace(/^#\s*🔗\s*模块链接.*$/gim, "")
+    .replace(/^#\s*@target\s+\S+\s*$/gim, "")
+  return cleaned.replace(/\n{3,}/g, "\n\n").replace(/^\n+/, "")
+}
+
+/**
+ * 把远端内容合成为本地模块内容：
+ * 在最后一条 #! 指令后插入链接区块，并给 #!desc 加时间戳。
+ * options.preserveCategory：本地保留的 #!category（null 表示本地无分类，不动上游的值）；
+ * 传入后更新时不再以上游的分类覆盖本地分类。
+ */
+export function composeUpdatedContent(
+  remote: string,
+  sourceUrl: string,
+  at: Date = new Date(),
+  options: { preserveCategory?: string | null } = {}
+): string {
+  let body = removeMarkers(normalizeNewlines(remote))
+
+  if (!DESC_RE.test(body)) {
+    const nameLine = body.match(/^#!\s*name\s*=.*$/im)
+    if (nameLine && nameLine.index !== undefined) {
+      const insertAt = nameLine.index + nameLine[0].length
+      body = `${body.slice(0, insertAt)}\n#!desc=${body.slice(insertAt)}`
+    } else {
+      body = `#!desc=\n${body}`
+    }
+  }
+
+  body = insertAfterLastDirective(
+    body,
+    `\n\n# 🔗 模块链接\n#SUBSCRIBED ${sourceUrl}\n`
+  )
+  body = body.replace(/\n{3,}/g, "\n\n")
+  body = body.replace(/^#!\s*desc\s*=\s*/im, `#!desc=🔗 [${formatStamp(at)}] `)
+  // 保留本地 #!category：更新时不以上游的值覆盖（与 SurgeModuleTools 2.04.2 本地改版一致）
+  body = applyPreservedCategory(body, options.preserveCategory ?? null)
+  return `${body.replace(/\s+$/, "")}\n`
+}
+
+/** 判断文件夹中的文件名是否应当作为模块处理 */
+export function isModuleFileName(fileName: string): boolean {
+  if (!fileName || fileName.startsWith(".")) {
+    return false
+  }
+  const lower = fileName.toLowerCase()
+  if (!lower.endsWith(".sgmodule")) {
+    return false
+  }
+  return !IGNORED_EXTENSIONS.some(ext => lower.endsWith(ext))
+}
+
+/** 把任意字符串转为合法文件名 */
+export function toValidFileName(input: string): string {
+  return input
+    .replace(/[/:*?"<>|]/g, "_")
+    .replace(/\.{2,}/g, ".")
+    .replace(/^[\s.]+|[\s.]+$/g, "")
+}
+
+/** 从 URL 推断模块名称 */
+export function deriveNameFromUrl(url: string): string {
+  const plain = url.split("?")[0].split("#")[0]
+  const segment = plain.substring(plain.lastIndexOf("/") + 1)
+  let decoded = segment
+  try {
+    decoded = decodeURIComponent(segment)
+  } catch {
+    decoded = segment
+  }
+  const name = decoded.replace(/\.sgmodule$/i, "")
+  return toValidFileName(name)
+}
+
+/** 取路径中的文件名 */
+export function fileNameOf(path: string): string {
+  const index = path.lastIndexOf("/")
+  return index >= 0 ? path.substring(index + 1) : path
+}
+
+/** 取路径中的目录 */
+export function directoryOf(path: string): string {
+  const index = path.lastIndexOf("/")
+  return index > 0 ? path.substring(0, index) : path
+}
+
+/** 取 URL 的 host，用于列表摘要 */
+export function hostOf(url: string | null): string {
+  if (!url) {
+    return ""
+  }
+  const match = url.match(/^[a-z]+:\/\/([^/]+)/i)
+  return match ? match[1] : url
+}
+
+/** 读取文件时间戳（毫秒） */
+export function timestampOf(date: Date | number | null | undefined): number {
+  if (!date) {
+    return 0
+  }
+  return typeof date === "number" ? date : date.getTime()
+}
+
+/** 时间戳格式化为 “x 分钟前” */
+export function relativeTime(timestamp: number): string {
+  if (!timestamp) {
+    return "未更新"
+  }
+  const diff = Date.now() - timestamp
+  if (diff < 60_000) {
+    return "刚刚"
+  }
+  if (diff < 3_600_000) {
+    return `${Math.floor(diff / 60_000)} 分钟前`
+  }
+  if (diff < 86_400_000) {
+    return `${Math.floor(diff / 3_600_000)} 小时前`
+  }
+  if (diff < 30 * 86_400_000) {
+    return `${Math.floor(diff / 86_400_000)} 天前`
+  }
+  return new Date(timestamp).toLocaleDateString()
+}
+
+/** 文件大小格式化 */
+export function formatBytes(size: number): string {
+  if (!size || size < 1024) {
+    return `${size || 0} B`
+  }
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`
+  }
+  return `${(size / 1024 / 1024).toFixed(2)} MB`
+}

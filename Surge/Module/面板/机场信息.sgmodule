@@ -1,0 +1,30 @@
+#!name=机场流量信息max
+#!desc=显示机场剩余流量信息以及套餐到期日期
+#!system=ios
+#!category=面板
+#!arguments=NAME_1:第一个机场的名字,update_interval_1:3600,URL_1:机场订阅链接（直接粘贴）,RESET_Day_1:重置日期,ICON_1:externaldrive.fill.badge.icloud,COLOR_1:#FFB6C1,NAME_2:第二个机场的名字,update_interval_2:3600,URL_2:机场订阅链接（直接粘贴）,RESET_Day_2:重置日期,ICON_2:internaldrive.fill,COLOR_2:#87CEFA
+#!arguments-desc=[参数设置]\n\n⓵ NAME: 写你机场的名字,默认开启单订阅。\n\n⓶ URL: 机场订阅链接，直接粘贴原始链接，不用转编码（以前转过码的链接也能继续用）。\n\n⓷ RESET_DAY: 流量每月重置的日期,如26号就写26,不设置则不显示流量重置日,仅显示到期日期。\n\n⓸ ICON: 自定义面板图标,需为有效的SFSymbolName,如不设置则默认。\n\n⓹ COLOR: 自定义图标颜色,需为颜色的HEX编码。\n\nupdate-interval:面板更新时间\n\n常见颜色编码:\n石榴红#C0392B  孔雀绿#16A085  紫水晶#9B59B6  \n橙玫瑰#F39C12  墨绿色#1F618D  琥珀色#FFBF00  \n靛青色#2980B9  银蓝色#5DADE2  赤金色#E74C3C   \n橄榄青#556B2F  玫瑰金#B76E79  深宝蓝#0E4D92  \n铜黄色#B87333  孔雀蓝#005E7D  绯红色#A61C3C   \n橄榄木#808000  藏青色#4A4E4D  紫罗兰#C21E56   \n琥珀褐#6C2E1F   珍珠灰#EAEAEA  蔚蓝色#1E90FF \n青柠色#7FFF00  浅粉色#FFB6C1  淡青色#00CED1 \n淡黄色#FFFFE0  水鸭色#00CED1  淡蓝色#ADD8E6  \n苹果绿#8DB600  金菊色#DAA520  甜豆色#DAA520 
+#订阅链接直接粘原始链接，不用再转编码（模块已改：url 放 argument 最后一位，脚本整段解析）
+#备用（3、4 号机场）：参数声明分行写时，两行之间必须用逗号连上，不然整段参数解析失败、设置字段和说明全不显示；所以 3、4 号先不放进声明里，留在这里备用。以后要用时，把下面这行追加到上面 #!arguments 行的末尾（前面加一个逗号），再把 [Panel] 和 [Script] 里 3、4 号那几行的 # 去掉。
+#—————————————————————————————
+#NAME_3:第三个机场的名字,update_interval_3:3600,URL_3:第三个机场订阅链接,RESET_Day_3:重置日期,ICON_3:externaldrive.fill.badge.icloud,COLOR_3:#FFB6C1,NAME_4:第四个机场的名字,update_interval_4:3600,URL_4:第四个机场订阅链接,RESET_Day_4:重置日期,ICON_4:internaldrive.fill,COLOR_4:#87CEFA
+#————————————————————————————
+[Panel]
+{{{NAME_1}}}=script-name={{{NAME_1}}},update-interval={{{update_interval_1}}}
+
+{{{NAME_2}}}=script-name={{{NAME_2}}},update-interval={{{update_interval_2}}}
+
+#{{{NAME_3}}}=script-name={{{NAME_3}}},update-interval={{{update_interval_3}}}
+
+#{{{NAME_4}}}=script-name={{{NAME_4}}},update-interval={{{update_interval_4}}}
+
+[Script]
+{{{NAME_1}}}=type=generic,timeout=10,script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/%E6%9C%BA%E5%9C%BA%E4%BF%A1%E6%81%AF.js,script-update-interval=0,argument=reset_day={{{RESET_Day_1}}}&title={{{NAME_1}}}&icon={{{ICON_1}}}&color={{{COLOR_1}}}&url={{{URL_1}}}
+
+{{{NAME_2}}}=type=generic,timeout=10,script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/%E6%9C%BA%E5%9C%BA%E4%BF%A1%E6%81%AF.js,script-update-interval=0,argument=reset_day={{{RESET_Day_2}}}&title={{{NAME_2}}}&icon={{{ICON_2}}}&color={{{COLOR_2}}}&url={{{URL_2}}}
+
+
+#{{{NAME_3}}}=type=generic,timeout=10,script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/%E6%9C%BA%E5%9C%BA%E4%BF%A1%E6%81%AF.js,script-update-interval=0,argument=reset_day={{{RESET_Day_3}}}&title={{{NAME_3}}}&icon={{{ICON_3}}}&color={{{COLOR_3}}}&url={{{URL_3}}}
+
+#{{{NAME_4}}}=type=generic,timeout=10,script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/%E6%9C%BA%E5%9C%BA%E4%BF%A1%E6%81%AF.js,script-update-interval=0,argument=reset_day={{{RESET_Day_4}}}&title={{{NAME_4}}}&icon={{{ICON_4}}}&color={{{COLOR_4}}}&url={{{URL_4}}}
+
