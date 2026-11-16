@@ -23,7 +23,7 @@
     "urls"
   ],
   "color" : "rgba(10, 132, 255, 1)",
-  "version" : "1.0.0",
+  "version" : "1.0.1",
   "entry" : "index.tsx",
   "description" : "Surge-only local module manager: batch-update #SUBSCRIBED Surge modules, install from URL, reload Surge, and preserve local #!category on update.",
   "icon" : "square.stack.3d.up.fill",
