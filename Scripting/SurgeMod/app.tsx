@@ -1,4 +1,4 @@
-import { VStack, ZStack, useState } from "scripting"
+import { NavigationStack, VStack, ZStack, useState } from "scripting"
 import { LibraryProvider } from "./contexts/LibraryContext"
 import { IconProvider } from "./contexts/IconContext"
 import { loadSettings } from "./services/settingsStore"
@@ -20,9 +20,11 @@ export function App({
     <IconProvider>
       <LibraryProvider initialSettings={settings}>
         <ZStack>
-          <VStack frame={fullFillFrame}>
-            <SurgeHomePage initialUrl={initialUrl} initialName={initialName} />
-          </VStack>
+          <NavigationStack>
+            <VStack frame={fullFillFrame}>
+              <SurgeHomePage initialUrl={initialUrl} initialName={initialName} />
+            </VStack>
+          </NavigationStack>
           <ToastHost />
         </ZStack>
       </LibraryProvider>
