@@ -22,6 +22,60 @@
       "repo": "https://github.com/baynidn/tools",
       "script": "https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js",
       "icons": ["https://raw.githubusercontent.com/chavyleung/scripts/master/BOXJS.png"]
+    },
+    {
+      "id": "pan_uc",
+      "name": "UC网盘 Cookie",
+      "keys": ["PanCookie_UC"],
+      "author": "@baynidn",
+      "repo": "https://github.com/baynidn/tools",
+      "script": "https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js",
+      "icons": ["https://raw.githubusercontent.com/chavyleung/scripts/master/BOXJS.png"]
+    },
+    {
+      "id": "pan_123",
+      "name": "123云盘 Cookie",
+      "keys": ["PanCookie_123"],
+      "author": "@baynidn",
+      "repo": "https://github.com/baynidn/tools",
+      "script": "https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js",
+      "icons": ["https://raw.githubusercontent.com/chavyleung/scripts/master/BOXJS.png"]
+    },
+    {
+      "id": "pan_189",
+      "name": "天翼云盘 Cookie",
+      "keys": ["PanCookie_189"],
+      "author": "@baynidn",
+      "repo": "https://github.com/baynidn/tools",
+      "script": "https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js",
+      "icons": ["https://raw.githubusercontent.com/chavyleung/scripts/master/BOXJS.png"]
+    },
+    {
+      "id": "pan_139",
+      "name": "移动云盘 Cookie",
+      "keys": ["PanCookie_139"],
+      "author": "@baynidn",
+      "repo": "https://github.com/baynidn/tools",
+      "script": "https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js",
+      "icons": ["https://raw.githubusercontent.com/chavyleung/scripts/master/BOXJS.png"]
+    },
+    {
+      "id": "pan_115",
+      "name": "115网盘 Cookie",
+      "keys": ["PanCookie_115"],
+      "author": "@baynidn",
+      "repo": "https://github.com/baynidn/tools",
+      "script": "https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js",
+      "icons": ["https://raw.githubusercontent.com/chavyleung/scripts/master/BOXJS.png"]
+    },
+    {
+      "id": "pan_xunlei",
+      "name": "迅雷云盘 Cookie",
+      "keys": ["PanCookie_Xunlei"],
+      "author": "@baynidn",
+      "repo": "https://github.com/baynidn/tools",
+      "script": "https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js",
+      "icons": ["https://raw.githubusercontent.com/chavyleung/scripts/master/BOXJS.png"]
     }
   ]
 }
