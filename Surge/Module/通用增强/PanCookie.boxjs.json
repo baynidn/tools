@@ -1,0 +1,27 @@
+{
+  "id": "baynidn.pan.cookie",
+  "name": "网盘 Cookie",
+  "author": "@baynidn",
+  "icon": "https://raw.githubusercontent.com/chavyleung/scripts/master/BOXJS.png",
+  "repo": "https://github.com/baynidn/tools",
+  "apps": [
+    {
+      "id": "pan_quark",
+      "name": "夸克网盘 Cookie",
+      "keys": ["PanCookie_Quark"],
+      "author": "@baynidn",
+      "repo": "https://github.com/baynidn/tools",
+      "script": "https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js",
+      "icons": ["https://raw.githubusercontent.com/chavyleung/scripts/master/BOXJS.png"]
+    },
+    {
+      "id": "pan_baidu",
+      "name": "百度网盘 Cookie",
+      "keys": ["PanCookie_Baidu"],
+      "author": "@baynidn",
+      "repo": "https://github.com/baynidn/tools",
+      "script": "https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js",
+      "icons": ["https://raw.githubusercontent.com/chavyleung/scripts/master/BOXJS.png"]
+    }
+  ]
+}
