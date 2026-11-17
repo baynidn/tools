@@ -14,6 +14,7 @@ import {
   toValidFileName,
 } from "../utils/moduleContent"
 import {
+  buildRemoteImportUrl,
   fileNameFromConvertedUrl,
   parseModuleInput,
   stripKnownExtension,
@@ -360,6 +361,18 @@ export async function reloadSurge(): Promise<boolean> {
     return true
   } catch (error) {
     console.log("重载 Surge 失败", error)
+    return false
+  }
+}
+
+/** 把模块安装/更新到 Surge：打开安装链接，Surge 会弹出安装确认，确认后才替换已装的旧版。
+ * 只更新本地文件是不够的——Surge 读的是自己装好的那份，不读本工具的模块目录，
+ * 所以“更新”必须走到这一步，否则只变标题、不变内容（2026-11-17 PanCookie 教训）。 */
+export async function installToSurge(url: string, name?: string): Promise<boolean> {
+  try {
+    return await Safari.openURL(buildRemoteImportUrl(url, name))
+  } catch (error) {
+    console.log("打开 Surge 安装链接失败", error)
     return false
   }
 }
