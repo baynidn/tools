@@ -1,0 +1,11 @@
+#!name=网盘 Cookie 抓取
+#!desc=打开夸克/百度网盘 App（或 Safari 网页版）即自动抓取 Cookie 存入 BoxJs，打开 boxjs.com 复制。须先装 BoxJs。
+#!system=ios
+#!category=增强插件
+
+[Script]
+PanCookie_Quark = type=http-request, pattern=^https?://(pan|uop)\.quark\.cn/, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js, requires-body=false
+PanCookie_Baidu = type=http-request, pattern=^https?://(pan|pcs|d\.pcs)\.baidu\.com/, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js, requires-body=false
+
+[MITM]
+hostname = %APPEND% pan.quark.cn, uop.quark.cn, pan.baidu.com, pcs.baidu.com, d.pcs.baidu.com
