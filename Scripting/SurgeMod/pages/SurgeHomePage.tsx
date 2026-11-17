@@ -39,6 +39,16 @@ export function SurgeHomePage({
     failed: modules.filter(item => item.status === "failed").length,
   }), [modules])
 
+  // 右上角 ↻ = 回到正常首页：收起安装表单、清掉安装结果/错误，再重新扫描模块。
+  // 只重新扫描不收表单，用户点了还停在安装界面（2026-11-17 用户反馈）。
+  // 链接和名称不清空，避免丢掉刚输好或深链带进来的地址。
+  async function handleRefresh() {
+    setShowInstall(false)
+    setInstallError(null)
+    setInstallResult(null)
+    await refresh()
+  }
+
   async function submitInstall() {
     if (!url.trim()) {
       setInstallError("请填写模块链接")
@@ -74,7 +84,7 @@ export function SurgeHomePage({
         navigationTitle="SurgeMod"
         navigationBarTitleDisplayMode="inline"
         toolbarBackgroundVisibility="hidden"
-        toolbar={rootToolbar(dismiss, () => void refresh(), busy)}
+        toolbar={rootToolbar(dismiss, () => void handleRefresh(), busy)}
         frame={fullFillFrame}
       >
         <VStack alignment="leading" spacing={spacing.lg} padding={spacing.lg} frame={leadingFillFrame}>
