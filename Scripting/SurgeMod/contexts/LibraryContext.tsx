@@ -2,7 +2,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ModuleEntry, Settings, UpdateResult, UpdateSummary } from "../types"
 import {
   installFromURL,
-  installToSurge,
   reloadSurge,
   scanModules,
   updateAllModules,
@@ -140,12 +139,13 @@ export function LibraryProvider({
         const result = await updateModule(entry, settings)
         setModules(current => mergeEntry(current, result.entry))
         if (result.ok) {
-          // 本地文件更新完必须再安装到 Surge，否则 Surge 还是跑旧版（只变标题、不变内容）
-          const installed = await installToSurge(result.entry.subscribedUrl, result.entry.name)
-          if (installed) {
-            showNotice(`✅ ${result.entry.name} 已更新 · 正在安装到 Surge，请在 Surge 里确认`)
+          // 本地文件更新完必须让 Surge 重载，否则 Surge 还是跑旧版（只变标题、不变内容）。
+          // 和模块坞 / SurgeModuleTool 一样用重载，不跳去 Surge 点安装。
+          const reloaded = await reloadSurge()
+          if (reloaded) {
+            showNotice(`✅ ${result.entry.name} 已更新 · 已请求 Surge 重载`)
           } else {
-            showNotice(`✅ ${result.entry.name} 本地已更新 · 未能自动打开 Surge，请在 Surge 里重新安装一次`)
+            showNotice(`✅ ${result.entry.name} 本地已更新 · 重载失败，请在 Surge 里手动重载或刷新模块`)
           }
         } else if (result.reason === "no-url") {
           showNotice(`🈚️ ${entry.fileName} 没有订阅链接`)
