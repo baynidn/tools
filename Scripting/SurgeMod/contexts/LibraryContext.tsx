@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ModuleEntry, Settings, UpdateResult, UpdateSummary } from "../types"
 import {
   installFromURL,
+  installToSurge,
   reloadSurge,
   scanModules,
   updateAllModules,
@@ -139,14 +140,13 @@ export function LibraryProvider({
         const result = await updateModule(entry, settings)
         setModules(current => mergeEntry(current, result.entry))
         if (result.ok) {
-          const changes: string[] = []
-          if (result.changedName) {
-            changes.push(`名称：${entry.name} → ${result.entry.name}`)
+          // 本地文件更新完必须再安装到 Surge，否则 Surge 还是跑旧版（只变标题、不变内容）
+          const installed = await installToSurge(result.entry.subscribedUrl, result.entry.name)
+          if (installed) {
+            showNotice(`✅ ${result.entry.name} 已更新 · 正在安装到 Surge，请在 Surge 里确认`)
+          } else {
+            showNotice(`✅ ${result.entry.name} 本地已更新 · 未能自动打开 Surge，请在 Surge 里重新安装一次`)
           }
-          if (result.changedDesc) {
-            changes.push(`描述已更新`)
-          }
-          showNotice(changes.length > 0 ? `✅ ${result.entry.name} 已更新 · ${changes.join(" · ")}` : `✅ ${result.entry.name} 已更新`)
         } else if (result.reason === "no-url") {
           showNotice(`🈚️ ${entry.fileName} 没有订阅链接`)
         } else {
