@@ -1,7 +1,7 @@
 import type { Settings } from "../types"
 
 /** 工具版本 */
-export const TOOL_VERSION = "1.0.2"
+export const TOOL_VERSION = "1.0.3"
 
 /** 原版工具使用的请求头 */
 export const DEFAULT_USER_AGENT = "script-hub/1.0.0"
