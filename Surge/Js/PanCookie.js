@@ -1,19 +1,21 @@
-// PanCookie.js v2 - 抓取各网盘 Cookie，存入 BoxJs（$persistentStore），在 boxjs.com 里直接复制
+// PanCookie.js v3 - 抓取各网盘 Cookie，存入 BoxJs（$persistentStore），在 boxjs.com 里直接复制
 // 配合模块 PanCookie.sgmodule 使用；BoxJs 订阅见 PanCookie.boxjs.json
 // 支持：夸克 / 百度 / UC / 123 / 天翼 / 移动 / 115 / 迅雷
+// v3 改动：只在 Cookie 里含登录字段时才保存，未登录的游客 Cookie 不存、不弹通知
 // 注意：HTTPS 请求必须 MITM 才能看到 Cookie；App 若有证书锁定抓不到时，改用 Safari 打开对应网盘网页版登录后刷新
 
 (function () {
-  // 网盘列表：host 正则 -> BoxJs 键名 -> 显示名
+  // 网盘列表：host 正则 -> BoxJs 键名 -> 显示名 -> 登录字段（Cookie 里必须含这些才算已登录）
+  // 123 与迅雷的登录字段暂未核实（need 为空，先按原样保存）
   var PANS = [
-    { re: /^(pan|uop|drive-pc|drive-m)\.quark\.cn$/i, key: 'PanCookie_Quark', name: '夸克网盘' },
-    { re: /^(pan|pcs|d\.pcs)\.baidu\.com$/i, key: 'PanCookie_Baidu', name: '百度网盘' },
-    { re: /^drive\.uc\.cn$/i, key: 'PanCookie_UC', name: 'UC网盘' },
-    { re: /^(yun|www)\.123pan\.(cn|com)$/i, key: 'PanCookie_123', name: '123云盘' },
-    { re: /^(cloud|api\.cloud)\.189\.cn$/i, key: 'PanCookie_189', name: '天翼云盘' },
-    { re: /^(yun|caiyun)\.139\.com$/i, key: 'PanCookie_139', name: '移动云盘' },
-    { re: /^([^.]+\.)*115\.com$/i, key: 'PanCookie_115', name: '115网盘' },
-    { re: /^pan\.xunlei\.com$/i, key: 'PanCookie_Xunlei', name: '迅雷云盘' }
+    { re: /^(pan|uop|drive-pc|drive-m)\.quark\.cn$/i, key: 'PanCookie_Quark', name: '夸克网盘', need: ['__pus='] },
+    { re: /^(pan|pcs|d\.pcs)\.baidu\.com$/i, key: 'PanCookie_Baidu', name: '百度网盘', need: ['BDUSS='] },
+    { re: /^drive\.uc\.cn$/i, key: 'PanCookie_UC', name: 'UC网盘', need: ['__puus='] },
+    { re: /^(yun|www)\.123pan\.(cn|com)$/i, key: 'PanCookie_123', name: '123云盘', need: [] },
+    { re: /^(cloud|api\.cloud)\.189\.cn$/i, key: 'PanCookie_189', name: '天翼云盘', need: ['SSON='] },
+    { re: /^(yun|caiyun)\.139\.com$/i, key: 'PanCookie_139', name: '移动云盘', need: ['Authorization='] },
+    { re: /^([^.]+\.)*115\.com$/i, key: 'PanCookie_115', name: '115网盘', need: ['UID=', 'SEID='] },
+    { re: /^pan\.xunlei\.com$/i, key: 'PanCookie_Xunlei', name: '迅雷云盘', need: [] }
   ];
 
   var url = ($request && $request.url) || '';
@@ -42,6 +44,11 @@
 
   // 没有 Cookie 就原样放行
   if (!cookie) { $done({}); return; }
+
+  // 必须含登录字段才算已登录，否则是游客 Cookie，不存、不通知
+  for (var k = 0; k < pan.need.length; k++) {
+    if (cookie.indexOf(pan.need[k]) === -1) { $done({}); return; }
+  }
 
   try {
     // 只有变化时才写并通知，避免每次请求都弹通知
