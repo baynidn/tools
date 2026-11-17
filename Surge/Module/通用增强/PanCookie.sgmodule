@@ -1,17 +1,20 @@
 #!name=网盘 Cookie 抓取
-#!desc=打开夸克/百度/UC/123/天翼/移动/115/迅雷网盘 App（或 Safari 网页版）即自动抓取 Cookie 存入 BoxJs，打开 boxjs.com 复制。须先装 BoxJs。（v5：静默保存，不弹通知）
+#!desc=打开夸克/百度/UC/123/天翼/移动/115/迅雷网盘 App（或 Safari 网页版）即自动抓取 Cookie 存入 BoxJs，打开 boxjs.com 复制。须先装 BoxJs。（v6：百度只在会话接口触发，登录变化才写，不卡手机）
 #!system=ios
 #!category=增强插件
 
 [Script]
-PanCookie_Quark = type=http-request, pattern=^https?://(pan|uop|drive-pc|drive-m)\.quark\.cn/, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v5, requires-body=false
-PanCookie_Baidu = type=http-request, pattern=^https?://(pan|pcs|d\.pcs)\.baidu\.com/, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v5, requires-body=false
-PanCookie_UC = type=http-request, pattern=^https?://drive\.uc\.cn/, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v5, requires-body=false
-PanCookie_123 = type=http-request, pattern=^https?://(yun|www)\.123pan\.(cn|com)/, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v5, requires-body=false
-PanCookie_189 = type=http-request, pattern=^https?://(cloud|api\.cloud)\.189\.cn/, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v5, requires-body=false
-PanCookie_139 = type=http-request, pattern=^https?://(yun|caiyun)\.139\.com/, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v5, requires-body=false
-PanCookie_115 = type=http-request, pattern=^https?://([^/]*\.)?115\.com/, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v5, requires-body=false
-PanCookie_Xunlei = type=http-request, pattern=^https?://pan\.xunlei\.com/, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v5, requires-body=false
+PanCookie_Quark = type=http-request, pattern=^https?://(pan|uop|drive-pc|drive-m)\.quark\.cn/, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v6, requires-body=false
+PanCookie_Baidu = type=http-request, pattern=^https?://pan\.baidu\.com/rest/2\.0/xpan/nas\?.*method=uinfo, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v6, requires-body=false
+PanCookie_Baidu_Login = type=http-request, pattern=^https?://pan\.baidu\.com/api/loginStatus, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v6, requires-body=false
+PanCookie_Baidu_Member = type=http-request, pattern=^https?://pan\.baidu\.com/rest/\d+\.\d+/membership/user, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v6, requires-body=false
+PanCookie_Baidu_List = type=http-request, pattern=^https?://pan\.baidu\.com/rest/2\.0/xpan/file\?.*method=list, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v6, requires-body=false
+PanCookie_UC = type=http-request, pattern=^https?://drive\.uc\.cn/, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v6, requires-body=false
+PanCookie_123 = type=http-request, pattern=^https?://(yun|www)\.123pan\.(cn|com)/, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v6, requires-body=false
+PanCookie_189 = type=http-request, pattern=^https?://(cloud|api\.cloud)\.189\.cn/, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v6, requires-body=false
+PanCookie_139 = type=http-request, pattern=^https?://(yun|caiyun)\.139\.com/, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v6, requires-body=false
+PanCookie_115 = type=http-request, pattern=^https?://([^/]*\.)?115\.com/, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v6, requires-body=false
+PanCookie_Xunlei = type=http-request, pattern=^https?://pan\.xunlei\.com/, script-path=https://raw.githubusercontent.com/baynidn/tools/main/Surge/Js/PanCookie.js?v6, requires-body=false
 
 [MITM]
 hostname = %APPEND% pan.quark.cn, uop.quark.cn, drive-pc.quark.cn, drive-m.quark.cn, pan.baidu.com, pcs.baidu.com, d.pcs.baidu.com, drive.uc.cn, yun.123pan.cn, www.123pan.cn, www.123pan.com, cloud.189.cn, api.cloud.189.cn, yun.139.com, caiyun.139.com, 115.com, webapi.115.com, proapi.115.com, www.115.com, pan.xunlei.com
