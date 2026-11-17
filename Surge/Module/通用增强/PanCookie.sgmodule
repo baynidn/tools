@@ -1,5 +1,5 @@
 #!name=网盘 Cookie 抓取
-#!desc=打开夸克/百度/UC/123/天翼/移动/115/迅雷网盘 App（或 Safari 网页版）即自动抓取 Cookie 存入 BoxJs，打开 boxjs.com 复制。须先装 BoxJs。
+#!desc=打开夸克/百度/UC/123/天翼/移动/115/迅雷网盘 App（或 Safari 网页版）即自动抓取 Cookie 存入 BoxJs，打开 boxjs.com 复制。须先装 BoxJs。（v4：只在登录变化时通知）
 #!system=ios
 #!category=增强插件
 
