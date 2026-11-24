@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""微信视频号下载服务 - 路由器版（纯标准库，无需 Flask/pip）
-粘贴 weixin.qq.com/sph/... 链接，两种保存方式：
+"""微信视频号 / Bilibili / 抖音下载服务 - 路由器版（纯标准库，无需 Flask/pip）
+粘贴分享链接，两种保存方式：
   1. 下载到路由器：解析 -> 下载 MP4 -> 存到 /data
   2. 下载到手机/本地：解析 -> 流式转发给浏览器，存到手机，不存路由器
-解析走 CukeDown 公开解析接口，无需登录、无需 Cookie。
+支持：微信视频号（weixin.qq.com/sph/...）、Bilibili（bilibili.com/video/BV... / b23.tv/...）、抖音（douyin.com/video/... / v.douyin.com/... / jingxuan?modal_id=...）。
+解析走 CukeDown 公开解析接口，无需登录、无需 Cookie。个别抖音视频若作者限制分享或仅登录可见会解析失败。
 启动：python3 app.py   环境变量：WXDL_DATA（默认 /data）、WXDL_PASSWORD（空=不设密码）、PORT（默认 5000）
 """
 import json
@@ -28,7 +29,24 @@ UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like 
 jobs = {}  # job_id -> {status, title, author, filename, size, error, progress}
 job_lock = threading.Lock()
 
-SPH_RE = re.compile(r"https?://weixin\.qq\.com/sph/[A-Za-z0-9]+", re.I)
+URL_RES = [
+    (re.compile(r"https?://weixin\.qq\.com/sph/[A-Za-z0-9]+", re.I), "https://channels.weixin.qq.com/"),
+    (re.compile(r"https?://(?:www\.)?bilibili\.com/video/(?:BV[A-Za-z0-9]+|av\d+)", re.I), "https://www.bilibili.com/"),
+    (re.compile(r"https?://b23\.tv/[A-Za-z0-9]+", re.I), "https://www.bilibili.com/"),
+    (re.compile(r"https?://(?:www\.)?douyin\.com/video/\d+", re.I), "https://www.douyin.com/"),
+    (re.compile(r"https?://v\.douyin\.com/[A-Za-z0-9]+", re.I), "https://www.douyin.com/"),
+    (re.compile(r"https?://(?:www\.)?douyin\.com/jingxuan\?modal_id=\d+", re.I), "https://www.douyin.com/"),
+    (re.compile(r"https?://(?:www\.)?iesdouyin\.com/share/video/\d+", re.I), "https://www.douyin.com/"),
+]
+
+
+def extract_link(text):
+    """从粘贴的文本里找出支持的视频链接，返回 (url, referer)，找不到返回 (None, None)。"""
+    for pat, ref in URL_RES:
+        m = pat.search(text)
+        if m:
+            return m.group(0), ref
+    return None, None
 UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
 EMOJI = re.compile(
     "[\U0001F300-\U0001F9FF\U00002600-\U000027BF\U0000FE00-\U0000FE0F\U0001F1E0-\U0001F1FF]+",
@@ -43,8 +61,8 @@ def safe_filename(author, title):
     return f"{author}_{desc}.mp4"
 
 
-def parse_sph(share_url):
-    """调用 CukeDown 解析接口，返回 {video_url, title, author}。"""
+def parse_link(share_url):
+    """调用 CukeDown 解析接口，返回 {video_url, title, author}。通用，支持视频号/B站/抖音。"""
     q = urllib.parse.quote(share_url, safe="")
     url = f"{PARSE_API}?url={q}"
     req = urllib.request.Request(
@@ -85,11 +103,11 @@ def parse_sph(share_url):
     raise RuntimeError("解析超时或无结果")
 
 
-def download_file(url, dest, job_id):
+def download_file(url, dest, job_id, referer):
     req = urllib.request.Request(
         url,
         headers={
-            "Referer": "https://channels.weixin.qq.com/",
+            "Referer": referer,
             "User-Agent": UA,
         },
     )
@@ -108,11 +126,11 @@ def download_file(url, dest, job_id):
     return dest
 
 
-def run_job(job_id, share_url):
+def run_job(job_id, share_url, referer):
     try:
         with job_lock:
             jobs[job_id]["status"] = "解析中"
-        info = parse_sph(share_url)
+        info = parse_link(share_url)
         with job_lock:
             jobs[job_id].update(
                 {"status": "下载中", "title": info["title"], "author": info["author"]}
@@ -124,7 +142,7 @@ def run_job(job_id, share_url):
             stem = dest.stem
             dest = DATA_DIR / f"{stem}_{n}.mp4"
             n += 1
-        download_file(info["video_url"], dest, job_id)
+        download_file(info["video_url"], dest, job_id, referer)
         with open(dest, "rb") as f:
             head = f.read(16)
         if b"ftyp" not in head and b"mp4" not in head.lower():
@@ -156,7 +174,7 @@ button{background:#07c160;color:#fff;border:0;border-radius:8px}
 
 PAGE = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>视频号下载</title><style>
+<title>视频下载</title><style>
 body{font-family:-apple-system,system-ui,sans-serif;max-width:640px;margin:0 auto;padding:16px}
 input,button{font-size:17px;padding:12px;width:100%;box-sizing:border-box}
 button{background:#07c160;color:#fff;border:0;border-radius:8px;margin-top:10px}
@@ -165,9 +183,9 @@ button{background:#07c160;color:#fff;border:0;border-radius:8px;margin-top:10px}
 .item a{color:#07c160;text-decoration:none}
 .muted{color:#888;font-size:13px}
 </style></head><body>
-<h2>视频号下载</h2>
-<p class="muted">粘贴微信视频号分享链接（weixin.qq.com/sph/...），选存在路由器还是存到手机。</p>
-<input id="url" placeholder="粘贴视频号链接">
+<h2>视频下载</h2>
+<p class="muted">粘贴分享链接，选存在路由器还是存到手机。支持微信视频号、B站、抖音。</p>
+<input id="url" placeholder="粘贴视频号 / B站 / 抖音链接">
 <button onclick="dl()">下载到路由器</button>
 <button onclick="localDl()" style="background:#57606a">下载到手机（不存路由器）</button>
 <div id="status"></div>
@@ -298,15 +316,15 @@ class Handler(BaseHTTPRequestHandler):
                 return
             qs = urllib.parse.parse_qs(parsed.query)
             text = (qs.get("url") or [""])[0]
-            m = SPH_RE.search(text)
-            if not m:
+            link, referer = extract_link(text)
+            if not link:
                 self._send_json(
-                    {"ok": False, "error": "没找到视频号链接（weixin.qq.com/sph/...）"},
+                    {"ok": False, "error": "没找到支持的视频链接（视频号 / B站 / 抖音）"},
                     400,
                 )
                 return
             try:
-                info = parse_sph(m.group(0))
+                info = parse_link(link)
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, 502)
                 return
@@ -314,7 +332,7 @@ class Handler(BaseHTTPRequestHandler):
             quoted = urllib.parse.quote(filename)
             req = urllib.request.Request(
                 info["video_url"],
-                headers={"Referer": "https://channels.weixin.qq.com/", "User-Agent": UA},
+                headers={"Referer": referer, "User-Agent": UA},
             )
             try:
                 resp = urllib.request.urlopen(req, timeout=180)
@@ -397,17 +415,17 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 data = {}
             text = data.get("url", "")
-            m = SPH_RE.search(text)
-            if not m:
+            link, referer = extract_link(text)
+            if not link:
                 self._send_json(
-                    {"ok": False, "error": "没找到视频号链接（weixin.qq.com/sph/...）"}
+                    {"ok": False, "error": "没找到支持的视频链接（视频号 / B站 / 抖音）"}
                 )
                 return
             job_id = f"{int(time.time()*1000)}"
             with job_lock:
                 jobs[job_id] = {"status": "等待", "progress": 0}
             threading.Thread(
-                target=run_job, args=(job_id, m.group(0)), daemon=True
+                target=run_job, args=(job_id, link, referer), daemon=True
             ).start()
             self._send_json({"ok": True, "job_id": job_id})
             return
