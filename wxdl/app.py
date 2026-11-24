@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """微信视频号下载服务 - 路由器版
-粘贴 weixin.qq.com/sph/... 链接 -> 解析 -> 下载 MP4 -> 存到 /data
+粘贴 weixin.qq.com/sph/... 链接，两种保存方式：
+  1. 下载到路由器：解析 -> 下载 MP4 -> 存到 /data
+  2. 下载到手机/本地：解析 -> 流式转发给浏览器，存到手机，不存路由器
 解析走 CukeDown 公开解析接口，无需登录、无需 Cookie。
 """
 import json
@@ -13,7 +15,7 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory, stream_with_context
 
 DATA_DIR = Path(os.environ.get("WXDL_DATA", "/data"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -182,12 +184,19 @@ button{background:#07c160;color:#fff;border:0;border-radius:8px;margin-top:10px}
 .muted{color:#888;font-size:13px}
 </style></head><body>
 <h2>视频号下载</h2>
-<p class="muted">粘贴微信视频号分享链接（weixin.qq.com/sph/...），点下载，视频存到路由器。</p>
+<p class="muted">粘贴微信视频号分享链接（weixin.qq.com/sph/...），选存在路由器还是存到手机。</p>
 <input id="url" placeholder="粘贴视频号链接">
 <button onclick="dl()">下载到路由器</button>
+<button onclick="localDl()" style="background:#57606a">下载到手机（不存路由器）</button>
 <div id="status"></div>
-<h3>已下载</h3><div id="list">加载中…</div>
+<h3>已下载（路由器上）</h3><div id="list">加载中…</div>
 <script>
+function localDl(){
+  const url=document.getElementById('url').value.trim();
+  if(!url){document.getElementById('status').textContent='先粘贴链接';return;}
+  document.getElementById('status').textContent='正在解析，解析完开始下载到手机…';
+  window.location.href='/api/local?url='+encodeURIComponent(url);
+}
 async function dl(){
   const url=document.getElementById('url').value.trim();
   if(!url){document.getElementById('status').textContent='先粘贴链接';return;}
@@ -231,6 +240,41 @@ def login():
         r.set_cookie("wxdl_auth", PASSWORD, max_age=30 * 86400, httponly=True)
         return r
     return jsonify({"ok": False, "error": "密码不对"}), 401
+
+
+@app.route("/api/local")
+def local_download():
+    """解析后把视频流式转发给浏览器，存到手机/本地（不存路由器）。"""
+    text = request.args.get("url", "")
+    m = SPH_RE.search(text)
+    if not m:
+        return jsonify({"ok": False, "error": "没找到视频号链接（weixin.qq.com/sph/...）"}), 400
+    try:
+        info = parse_sph(m.group(0))
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 502
+    filename = safe_filename(info["author"], info["title"])
+    quoted = urllib.parse.quote(filename)
+
+    def generate():
+        req = urllib.request.Request(
+            info["video_url"],
+            headers={"Referer": "https://channels.weixin.qq.com/", "User-Agent": UA},
+        )
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            while True:
+                chunk = resp.read(1024 * 256)
+                if not chunk:
+                    break
+                yield chunk
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="video/mp4",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quoted}",
+        },
+    )
 
 
 @app.route("/api/download", methods=["POST"])
