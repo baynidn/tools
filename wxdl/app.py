@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""微信视频号下载服务 - 路由器版
+"""微信视频号下载服务 - 路由器版（纯标准库，无需 Flask/pip）
 粘贴 weixin.qq.com/sph/... 链接，两种保存方式：
   1. 下载到路由器：解析 -> 下载 MP4 -> 存到 /data
   2. 下载到手机/本地：解析 -> 流式转发给浏览器，存到手机，不存路由器
 解析走 CukeDown 公开解析接口，无需登录、无需 Cookie。
+启动：python3 app.py   环境变量：WXDL_DATA（默认 /data）、WXDL_PASSWORD（空=不设密码）、PORT（默认 5000）
 """
 import json
 import os
@@ -13,9 +14,8 @@ import time
 import urllib.parse
 import urllib.request
 from datetime import datetime
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-
-from flask import Flask, Response, jsonify, request, send_from_directory, stream_with_context
 
 DATA_DIR = Path(os.environ.get("WXDL_DATA", "/data"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -25,7 +25,6 @@ PORT = int(os.environ.get("PORT", "5000"))
 PARSE_API = "https://cuke.io/api/omni/parse/stream"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-app = Flask(__name__)
 jobs = {}  # job_id -> {status, title, author, filename, size, error, progress}
 job_lock = threading.Lock()
 
@@ -94,7 +93,7 @@ def download_file(url, dest, job_id):
             "User-Agent": UA,
         },
     )
-    with urllib.request.urlopen(req, timeout=120) as resp, open(dest, "wb") as f:
+    with urllib.request.urlopen(req, timeout=180) as resp, open(dest, "wb") as f:
         total = int(resp.headers.get("Content-Length") or 0)
         done = 0
         while True:
@@ -126,7 +125,6 @@ def run_job(job_id, share_url):
             dest = DATA_DIR / f"{stem}_{n}.mp4"
             n += 1
         download_file(info["video_url"], dest, job_id)
-        # 校验是有效 MP4
         with open(dest, "rb") as f:
             head = f.read(16)
         if b"ftyp" not in head and b"mp4" not in head.lower():
@@ -144,22 +142,6 @@ def run_job(job_id, share_url):
     except Exception as e:
         with job_lock:
             jobs[job_id].update({"status": "失败", "error": str(e)})
-
-
-def authed():
-    if not PASSWORD:
-        return True
-    return request.cookies.get("wxdl_auth") == PASSWORD
-
-
-@app.before_request
-def _auth():
-    if request.path in ("/login", "/api/login"):
-        return None
-    if not authed():
-        if request.path.startswith("/api/"):
-            return jsonify({"ok": False, "error": "未登录"}), 401
-        return LOGIN_HTML, 401
 
 
 LOGIN_HTML = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
@@ -227,98 +209,212 @@ load();
 </script></body></html>"""
 
 
-@app.route("/")
-def index():
-    return PAGE
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, fmt, *args):
+        pass
 
+    def _cookies(self):
+        raw = self.headers.get("Cookie", "")
+        out = {}
+        for part in raw.split(";"):
+            if "=" in part:
+                k, v = part.strip().split("=", 1)
+                out[k] = v
+        return out
 
-@app.route("/api/login", methods=["POST"])
-def login():
-    pw = request.form.get("pw") or (request.get_json(silent=True) or {}).get("pw")
-    if PASSWORD and pw == PASSWORD:
-        r = jsonify({"ok": True})
-        r.set_cookie("wxdl_auth", PASSWORD, max_age=30 * 86400, httponly=True)
-        return r
-    return jsonify({"ok": False, "error": "密码不对"}), 401
+    def _authed(self):
+        if not PASSWORD:
+            return True
+        return self._cookies().get("wxdl_auth") == PASSWORD
 
+    def _send_json(self, obj, status=200, extra_headers=None):
+        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        if extra_headers:
+            for k, v in extra_headers.items():
+                self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(body)
 
-@app.route("/api/local")
-def local_download():
-    """解析后把视频流式转发给浏览器，存到手机/本地（不存路由器）。"""
-    text = request.args.get("url", "")
-    m = SPH_RE.search(text)
-    if not m:
-        return jsonify({"ok": False, "error": "没找到视频号链接（weixin.qq.com/sph/...）"}), 400
-    try:
-        info = parse_sph(m.group(0))
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 502
-    filename = safe_filename(info["author"], info["title"])
-    quoted = urllib.parse.quote(filename)
+    def _send_html(self, html, status=200):
+        body = html.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
-    def generate():
-        req = urllib.request.Request(
-            info["video_url"],
-            headers={"Referer": "https://channels.weixin.qq.com/", "User-Agent": UA},
-        )
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            while True:
-                chunk = resp.read(1024 * 256)
-                if not chunk:
-                    break
-                yield chunk
+    def _need_auth(self):
+        if self._authed():
+            return False
+        if self.path.startswith("/api/"):
+            self._send_json({"ok": False, "error": "未登录"}, 401)
+        else:
+            self._send_html(LOGIN_HTML, 401)
+        return True
 
-    return Response(
-        stream_with_context(generate()),
-        mimetype="video/mp4",
-        headers={
-            "Content-Disposition": f"attachment; filename*=UTF-8''{quoted}",
-        },
-    )
+    def do_GET(self):
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        if path == "/":
+            if self._need_auth():
+                return
+            self._send_html(PAGE)
+            return
+        if path == "/api/list":
+            if self._need_auth():
+                return
+            files = []
+            for p in sorted(
+                DATA_DIR.glob("*.mp4"), key=lambda x: x.stat().st_mtime, reverse=True
+            ):
+                st = p.stat()
+                files.append(
+                    {
+                        "name": p.name,
+                        "size": st.st_size,
+                        "mtime": datetime.fromtimestamp(st.st_mtime).strftime(
+                            "%Y-%m-%d %H:%M"
+                        ),
+                    }
+                )
+            self._send_json({"ok": True, "files": files})
+            return
+        if path.startswith("/api/job/"):
+            if self._need_auth():
+                return
+            job_id = path[len("/api/job/"):]
+            with job_lock:
+                j = jobs.get(job_id)
+            if not j:
+                self._send_json({"ok": False, "error": "任务不存在"}, 404)
+                return
+            self._send_json({"ok": True, **j})
+            return
+        if path == "/api/local":
+            if self._need_auth():
+                return
+            qs = urllib.parse.parse_qs(parsed.query)
+            text = (qs.get("url") or [""])[0]
+            m = SPH_RE.search(text)
+            if not m:
+                self._send_json(
+                    {"ok": False, "error": "没找到视频号链接（weixin.qq.com/sph/...）"},
+                    400,
+                )
+                return
+            try:
+                info = parse_sph(m.group(0))
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, 502)
+                return
+            filename = safe_filename(info["author"], info["title"])
+            quoted = urllib.parse.quote(filename)
+            req = urllib.request.Request(
+                info["video_url"],
+                headers={"Referer": "https://channels.weixin.qq.com/", "User-Agent": UA},
+            )
+            try:
+                resp = urllib.request.urlopen(req, timeout=180)
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, 502)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "video/mp4")
+            self.send_header(
+                "Content-Disposition", f"attachment; filename*=UTF-8''{quoted}"
+            )
+            length = resp.headers.get("Content-Length")
+            if length:
+                self.send_header("Content-Length", length)
+            self.end_headers()
+            try:
+                while True:
+                    chunk = resp.read(1024 * 256)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+            finally:
+                resp.close()
+            return
+        if path.startswith("/videos/"):
+            if self._need_auth():
+                return
+            name = urllib.parse.unquote(path[len("/videos/"):])
+            fp = DATA_DIR / name
+            if not fp.is_file() or fp.suffix.lower() != ".mp4":
+                self._send_json({"ok": False, "error": "文件不存在"}, 404)
+                return
+            size = fp.stat().st_size
+            self.send_response(200)
+            self.send_header("Content-Type", "video/mp4")
+            self.send_header("Content-Length", str(size))
+            self.send_header(
+                "Content-Disposition",
+                f"inline; filename*=UTF-8''{urllib.parse.quote(name)}",
+            )
+            self.end_headers()
+            with open(fp, "rb") as f:
+                while True:
+                    chunk = f.read(1024 * 256)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+            return
+        self._send_json({"ok": False, "error": "not found"}, 404)
 
-
-@app.route("/api/download", methods=["POST"])
-def download():
-    data = request.get_json(silent=True) or {}
-    text = data.get("url", "")
-    m = SPH_RE.search(text)
-    if not m:
-        return jsonify({"ok": False, "error": "没找到视频号链接（weixin.qq.com/sph/...）"})
-    job_id = f"{int(time.time()*1000)}"
-    with job_lock:
-        jobs[job_id] = {"status": "等待", "progress": 0}
-    threading.Thread(target=run_job, args=(job_id, m.group(0)), daemon=True).start()
-    return jsonify({"ok": True, "job_id": job_id})
-
-
-@app.route("/api/job/<job_id>")
-def job(job_id):
-    with job_lock:
-        j = jobs.get(job_id)
-    if not j:
-        return jsonify({"ok": False, "error": "任务不存在"}), 404
-    return jsonify({"ok": True, **j})
-
-
-@app.route("/api/list")
-def list_files():
-    files = []
-    for p in sorted(DATA_DIR.glob("*.mp4"), key=lambda x: x.stat().st_mtime, reverse=True):
-        st = p.stat()
-        files.append(
-            {
-                "name": p.name,
-                "size": st.st_size,
-                "mtime": datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M"),
-            }
-        )
-    return jsonify({"ok": True, "files": files})
-
-
-@app.route("/videos/<path:name>")
-def serve_video(name):
-    return send_from_directory(DATA_DIR, name, as_attachment=False)
+    def do_POST(self):
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        length = int(self.headers.get("Content-Length") or 0)
+        raw = self.rfile.read(length) if length else b""
+        if path == "/api/login":
+            try:
+                data = json.loads(raw.decode("utf-8") or "{}")
+                pw = data.get("pw")
+            except Exception:
+                pw = None
+            if pw is None:
+                form = urllib.parse.parse_qs(raw.decode("utf-8", errors="replace"))
+                pw = (form.get("pw") or [""])[0]
+            if PASSWORD and pw == PASSWORD:
+                self._send_json(
+                    {"ok": True},
+                    extra_headers={
+                        "Set-Cookie": f"wxdl_auth={PASSWORD}; Max-Age={30*86400}; HttpOnly; Path=/"
+                    },
+                )
+            else:
+                self._send_json({"ok": False, "error": "密码不对"}, 401)
+            return
+        if path == "/api/download":
+            if self._need_auth():
+                return
+            try:
+                data = json.loads(raw.decode("utf-8") or "{}")
+            except Exception:
+                data = {}
+            text = data.get("url", "")
+            m = SPH_RE.search(text)
+            if not m:
+                self._send_json(
+                    {"ok": False, "error": "没找到视频号链接（weixin.qq.com/sph/...）"}
+                )
+                return
+            job_id = f"{int(time.time()*1000)}"
+            with job_lock:
+                jobs[job_id] = {"status": "等待", "progress": 0}
+            threading.Thread(
+                target=run_job, args=(job_id, m.group(0)), daemon=True
+            ).start()
+            self._send_json({"ok": True, "job_id": job_id})
+            return
+        self._send_json({"ok": False, "error": "not found"}, 404)
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=PORT)
+    server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
+    print(f"wxdl listening on 0.0.0.0:{PORT}, data={DATA_DIR}", flush=True)
+    server.serve_forever()
