@@ -61,18 +61,37 @@ def safe_filename(author, title):
     return f"{author}_{desc}.mp4"
 
 
+def get_parse_token():
+    """先调 /api/omni/me 拿 parse_token 和 omni_vid cookie。
+    CukeDown 2026-11-25 起加了页面校验：解析接口必须带 pt 参数，否则 403
+    "页面校验已过期或非法调用"。token 12 小时过期，每次下载前现取。"""
+    req = urllib.request.Request(
+        "https://cuke.io/api/omni/me",
+        headers={"Referer": "https://cuke.io/", "User-Agent": UA},
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        cookie = (resp.headers.get("Set-Cookie") or "").split(";")[0]
+        data = json.loads(resp.read().decode("utf-8"))
+    token = data.get("parse_token") or ""
+    if not token:
+        raise RuntimeError("没拿到解析凭证")
+    return token, cookie
+
+
 def parse_link(share_url):
     """调用 CukeDown 解析接口，返回 {video_url, title, author}。通用，支持视频号/B站/抖音。"""
+    token, cookie = get_parse_token()
     q = urllib.parse.quote(share_url, safe="")
-    url = f"{PARSE_API}?url={q}"
-    req = urllib.request.Request(
-        url,
-        headers={
-            "Accept": "text/event-stream",
-            "Referer": "https://cuke.io/",
-            "User-Agent": UA,
-        },
-    )
+    pt = urllib.parse.quote(token, safe="")
+    url = f"{PARSE_API}?url={q}&pt={pt}"
+    headers = {
+        "Accept": "text/event-stream",
+        "Referer": "https://cuke.io/",
+        "User-Agent": UA,
+    }
+    if cookie:
+        headers["Cookie"] = cookie
+    req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=90) as resp:
         for raw in resp:
             line = raw.decode("utf-8", errors="replace").strip()
